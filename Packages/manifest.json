@@ -2,7 +2,7 @@
   "registry": "https://staging-packages.unity.com",
   "dependencies": {
     "com.unity.ads": "2.0.8",
-    "com.unity.analytics": "3.2.2",
+    "com.unity.analytics": "3.3.2",
     "com.unity.burst": "0.2.4-preview.40",
     "com.unity.cinemachine": "2.3.3",
     "com.unity.collab-proxy": "1.2.15",

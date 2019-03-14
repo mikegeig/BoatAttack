@@ -15,7 +15,13 @@ namespace WaterSystem
             serializedObject.Update();
             Water w = (Water)target;
 
-            var waterSettingsData = serializedObject.FindProperty("settingsData");
+			var waterJobsSetting = serializedObject.FindProperty("useJobs");
+			EditorGUILayout.PropertyField(waterJobsSetting, true);
+
+			var waterJobsTimingSetting = serializedObject.FindProperty("processDuringFrameRendering");
+			EditorGUILayout.PropertyField(waterJobsTimingSetting, true);
+
+			var waterSettingsData = serializedObject.FindProperty("settingsData");
             EditorGUILayout.PropertyField(waterSettingsData, true);
             if(waterSettingsData.objectReferenceValue != null)
             {

@@ -140,41 +140,123 @@ namespace WaterSystem
             {
                 processing = true;
 
-                // Buoyant Object Job
-                var waterHeight = new GerstnerWavesJobs.HeightJob()
-                {
-                    waveData = waveData,
-                    position = positions,
-                    offsetLength = new int2(0, positions.Length),
-                    time = Time.time,
-                    outPosition = wavePos,
-                    outNormal = tempNullNormal,
-                    normal = 0
-                };
-                // dependant on job4
-                waterHeightHandle = waterHeight.Schedule(positionCount, 32);
+				// Buoyant Object
+				UpdateHeight(positionCount, waveData, positions, wavePos, tempNullNormal, Time.time, new int2(0, positions.Length), 0);
 
-                // Simple Buoyant Object Job
-                var waterSimpleHeight = new GerstnerWavesJobs.HeightJob()
-                {
-                    waveData = waveData,
-                    position = simplePositions,
-                    offsetLength = new int2(0, simplePositions.Length),
-                    time = Time.time,
-                    outPosition = waveSimplePos,
-                    outNormal = waveSimpleNormal,
-                    normal = 1
-                };
-                // dependant on job4
-                waterSimpleHeightHandle = waterSimpleHeight.Schedule(simplePositionCount, 32);
-
-                JobHandle.ScheduleBatchedJobs();
+				// Simple Buoyant Object
+				UpdateHeight(simplePositionCount, waveData, simplePositions, waveSimplePos, waveSimpleNormal, Time.time, new int2(0, simplePositions.Length), 1);
 
                 firstFrame = false;
             }
         }
 
-        public static void CompleteJobs()
+		private static void UpdateHeight(int count, NativeArray<Wave> waveData, NativeArray<float3> position, 
+										NativeArray<float3> outPosition, NativeArray<float3> outNormal, float time, 
+										int2 offsetLength, int normal)
+		{
+			for (int i = 0; i < count; i++)
+			{
+
+				if (i >= offsetLength.x && i < offsetLength.y - offsetLength.x)
+				{
+					var waveCountMulti = 1f / waveData.Length;
+					float3 wavePos = new float3(0f, 0f, 0f);
+					float3 waveNorm = new float3(0f, 0f, 0f);
+
+					for (var wave = 0; wave < waveData.Length; wave++) // for each wave
+					{
+						// Wave data vars
+						var pos = position[i].xz;
+
+						var amplitude = waveData[wave].amplitude;
+						var direction = waveData[wave].direction;
+						var wavelength = waveData[wave].wavelength;
+						var omniPos = waveData[wave].origin;
+						////////////////////////////////wave value calculations//////////////////////////
+						var w = 6.28318f / wavelength; // 2pi over wavelength(hardcoded)
+						var wSpeed = math.sqrt(9.8f * w); // frequency of the wave based off wavelength
+						var peak = 0.8f; // peak value, 1 is the sharpest peaks
+						var qi = peak / (amplitude * w * waveData.Length);
+
+						var windDir = new float2(0f, 0f);
+						var dir = 0f;
+
+						direction = math.radians(direction); // convert the incoming degrees to radians
+						var windDirInput = new float2(math.sin(direction), math.cos(direction)) * (1 - waveData[wave].onmiDir); // calculate wind direction - TODO - currently radians
+						var windOmniInput = (pos - omniPos) * waveData[wave].onmiDir;
+
+						windDir += windDirInput;
+						windDir += windOmniInput;
+						windDir = math.normalize(windDir);
+						dir = math.dot(windDir, pos - (omniPos * waveData[wave].onmiDir)); // calculate a gradient along the wind direction
+
+						////////////////////////////position output calculations/////////////////////////
+						var calc = dir * w + -time * wSpeed; // the wave calculation
+						var cosCalc = math.cos(calc); // cosine version(used for horizontal undulation)
+						var sinCalc = math.sin(calc); // sin version(used for vertical undulation)
+
+						// calculate the offsets for the current point
+						wavePos.x += qi * amplitude * windDir.x * cosCalc;
+						wavePos.z += qi * amplitude * windDir.y * cosCalc;
+						wavePos.y += ((sinCalc * amplitude)) * waveCountMulti; // the height is divided by the number of waves 
+
+						if (normal == 1)
+						{
+							////////////////////////////normal output calculations/////////////////////////
+							float wa = w * amplitude;
+							// normal vector
+							float3 norm = new float3(-(windDir.xy * wa * cosCalc),
+											1 - (qi * wa * sinCalc));
+							waveNorm += (norm * waveCountMulti) * amplitude;
+						}
+					}
+					outPosition[i] = wavePos;
+					if (normal == 1) outNormal[i] = math.normalize(waveNorm.xzy);
+				}
+			}
+		}
+
+		public static void UpdateHeightsWithJobs()
+		{
+			if (!processing)
+			{
+				processing = true;
+
+				// Buoyant Object Job
+				var waterHeight = new GerstnerWavesJobs.HeightJob()
+				{
+					waveData = waveData,
+					position = positions,
+					offsetLength = new int2(0, positions.Length),
+					time = Time.time,
+					outPosition = wavePos,
+					outNormal = tempNullNormal,
+					normal = 0
+				};
+				// dependant on job4
+				waterHeightHandle = waterHeight.Schedule(positionCount, 32);
+
+				// Simple Buoyant Object Job
+				var waterSimpleHeight = new GerstnerWavesJobs.HeightJob()
+				{
+					waveData = waveData,
+					position = simplePositions,
+					offsetLength = new int2(0, simplePositions.Length),
+					time = Time.time,
+					outPosition = waveSimplePos,
+					outNormal = waveSimpleNormal,
+					normal = 1
+				};
+				// dependant on job4
+				waterSimpleHeightHandle = waterSimpleHeight.Schedule(simplePositionCount, 32);
+
+				JobHandle.ScheduleBatchedJobs();
+
+				firstFrame = false;
+			}
+		}
+
+		public static void CompleteJobs()
         {
             if (!firstFrame && processing)
             {

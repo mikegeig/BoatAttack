@@ -22,7 +22,8 @@ namespace WaterSystem
                 return _Instance;
             }
         }
-
+		public bool useJobs = true;
+		public bool processDuringFrameRendering = false;
         private bool useComputeBuffer;
         public bool computeOverride;
 
@@ -52,10 +53,15 @@ namespace WaterSystem
                                    Application.platform != RuntimePlatform.Android;
             else
                 useComputeBuffer = false;
-            Init();
+
+			Init();
             RenderPipelineManager.beginCameraRendering += BeginCameraRendering;
 
-            if(resources == null)
+			if(useJobs && processDuringFrameRendering)
+				RenderPipelineManager.beginFrameRendering += ProcessJobUpdate;
+
+
+			if (resources == null)
             {
                 resources = Resources.Load("WaterResources") as WaterResources;
             }
@@ -63,7 +69,10 @@ namespace WaterSystem
 
         private void OnDisable() {
             Cleanup();
-        }
+
+			if(useJobs && processDuringFrameRendering)
+				RenderPipelineManager.beginFrameRendering -= ProcessJobUpdate;
+		}
 
         void Cleanup()
         {
@@ -116,7 +125,18 @@ namespace WaterSystem
             }
         }
 
-        private void LateUpdate() {
+		private void LateUpdate()
+		{
+			if (!Application.isPlaying)
+				return;
+
+			if (!useJobs)
+				GerstnerWavesJobs.UpdateHeights();
+			else if (!processDuringFrameRendering)
+				GerstnerWavesJobs.UpdateHeightsWithJobs();
+		}
+
+		public void ProcessJobUpdate(Camera[] cams) {
             if(Application.isPlaying)
                 GerstnerWavesJobs.UpdateHeights();
         }
