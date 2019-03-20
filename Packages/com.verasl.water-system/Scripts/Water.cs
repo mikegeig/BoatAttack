@@ -26,8 +26,11 @@ namespace WaterSystem
 
         private bool useComputeBuffer;
         public bool computeOverride;
+		public bool useJobs;
+		public bool processDuringFrameRendering;
 
-        RenderTexture _depthTex;
+
+		RenderTexture _depthTex;
         public Texture _bakedDepthTex;
         private Camera _depthCam;
         [SerializeField]
@@ -62,7 +65,10 @@ namespace WaterSystem
             Init();
             RenderPipelineManager.beginCameraRendering += BeginCameraRendering;
 
-            if(resources == null)
+			if (useJobs && processDuringFrameRendering)
+				RenderPipelineManager.beginFrameRendering += ProcessJobUpdate;
+
+			if (resources == null)
             {
                 resources = Resources.Load("WaterResources") as WaterResources;
             }
@@ -124,12 +130,24 @@ namespace WaterSystem
             Shader.SetGlobalFloat("_GlobalTime", waterTime);
         }
 
-        private void LateUpdate() {
-            if(Application.isPlaying)
-                GerstnerWavesJobs.UpdateHeights();
-        }
+		private void LateUpdate()
+		{
+			if (!Application.isPlaying)
+				return;
 
-        public void FragWaveNormals(bool toggle)
+			if (!useJobs)
+				GerstnerWavesJobs.UpdateHeights();
+			else if (!processDuringFrameRendering)
+				GerstnerWavesJobs.UpdateHeightsWithJobs();
+		}
+
+		public void ProcessJobUpdate(ScriptableRenderContext context, Camera[] cams)
+		{
+			if (Application.isPlaying)
+				GerstnerWavesJobs.UpdateHeightsWithJobs();
+		}
+
+		public void FragWaveNormals(bool toggle)
         {
             Material mat = GetComponent<Renderer>().sharedMaterial;
             if (toggle)
